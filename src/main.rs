@@ -1,28 +1,39 @@
+use phf::phf_set;
 use std::env;
 use std::io;
 use std::process;
 
-const ALPHANUMERIC_CHARACTERS: [char; 63] = [
+static ALPHANUMERIC_CHARACTERS: phf::Set<char> = phf_set! {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
     't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
     'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4',
     '5', '6', '7', '8', '9', '_',
-];
+};
+
+fn match_escape_pattern(input_line: &str, escape_pattern: &char) -> bool {
+    let char = input_line.chars().next().unwrap();
+
+    match escape_pattern {
+        'd' => format!("{}", char).parse::<u32>().is_ok(),
+        'w' => ALPHANUMERIC_CHARACTERS.contains(&char),
+        _ => panic!("Unhandled escape pattern: {}", escape_pattern),
+    }
+}
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    if pattern.chars().count() == 1 {
-        input_line.contains(pattern)
-    } else if pattern.chars().count() == 2 {
-        if pattern.starts_with("\\d") {
-            input_line.parse::<u32>().is_ok()
-        } else if pattern.starts_with("\\w") {
-            let char = input_line.chars().next().unwrap();
-            ALPHANUMERIC_CHARACTERS.contains(&char)
-        } else {
-            panic!("Unhandled pattern: {}", pattern)
+    match pattern.len() {
+        1 => input_line.contains(pattern),
+        2 => {
+            let mut chars = pattern.chars();
+            let symbol = chars.next().unwrap();
+            let sub_pattern = chars.next().unwrap();
+
+            match symbol {
+                '\\' => match_escape_pattern(input_line, &sub_pattern),
+                _ => panic!("Unhandled symbol: {}", symbol),
+            }
         }
-    } else {
-        panic!("Unhandled pattern: {}", pattern)
+        _ => panic!("Unhandled pattern: {}", pattern),
     }
 }
 
