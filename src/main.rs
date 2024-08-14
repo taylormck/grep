@@ -23,17 +23,25 @@ fn match_escape_pattern(input_line: &str, escape_pattern: &char) -> bool {
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
     match pattern.len() {
         1 => input_line.contains(pattern),
-        2 => {
+        _ => {
             let mut chars = pattern.chars();
             let symbol = chars.next().unwrap();
             let sub_pattern = chars.next().unwrap();
 
             match symbol {
                 '\\' => match_escape_pattern(input_line, &sub_pattern),
+                '[' => {
+                    if let Some(end_index) = pattern.find(']') {
+                        pattern[1..end_index]
+                            .chars()
+                            .any(|character| match_pattern(input_line, &format!("{}", character)))
+                    } else {
+                        panic!("Found opening '[' but no closing ']'")
+                    }
+                }
                 _ => panic!("Unhandled symbol: {}", symbol),
             }
         }
-        _ => panic!("Unhandled pattern: {}", pattern),
     }
 }
 
