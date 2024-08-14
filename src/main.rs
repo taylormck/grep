@@ -26,15 +26,25 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         _ => {
             let mut chars = pattern.chars();
             let symbol = chars.next().unwrap();
-            let sub_pattern = chars.next().unwrap();
 
             match symbol {
-                '\\' => match_escape_pattern(input_line, &sub_pattern),
+                '\\' => {
+                    let sub_pattern = chars.next().unwrap();
+                    match_escape_pattern(input_line, &sub_pattern)
+                }
                 '[' => {
                     if let Some(end_index) = pattern.find(']') {
-                        pattern[1..end_index]
-                            .chars()
-                            .any(|character| match_pattern(input_line, &format!("{}", character)))
+                        let sub_pattern = &pattern[1..end_index];
+
+                        match sub_pattern.starts_with('^') {
+                            true => !sub_pattern[1..].chars().any(|character| {
+                                match_pattern(input_line, &format!("{}", character))
+                            }),
+
+                            false => sub_pattern.chars().any(|character| {
+                                match_pattern(input_line, &format!("{}", character))
+                            }),
+                        }
                     } else {
                         panic!("Found opening '[' but no closing ']'")
                     }
