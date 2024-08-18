@@ -22,11 +22,15 @@ static VALID_CHARACTERS: phf::Set<char> = phf_set! {
 };
 
 fn match_escape_pattern(input_characters: &mut core::str::Chars, escape_pattern: &char) -> bool {
-    match escape_pattern {
-        'd' => NUMERIC_CHARACTERS.contains(&input_characters.next().unwrap()),
-        'w' => ALPHANUMERIC_CHARACTERS.contains(&input_characters.next().unwrap()),
-        '\\' => input_characters.next().unwrap() == '\\',
-        _ => panic!("Unhandled escape pattern: {}", escape_pattern),
+    if let Some(next_char) = input_characters.next() {
+        match escape_pattern {
+            'd' => NUMERIC_CHARACTERS.contains(&next_char),
+            'w' => ALPHANUMERIC_CHARACTERS.contains(&next_char),
+            '\\' => next_char == '\\',
+            _ => panic!("Unhandled escape pattern: {}", escape_pattern),
+        }
+    } else {
+        false
     }
 }
 
@@ -86,7 +90,7 @@ fn main() {
     let mut input_chars = input_line.chars();
 
     while input_chars.next().is_some() {
-        if match_pattern(&mut input_chars, &pattern) {
+        if match_pattern(&mut input_chars.clone(), &pattern) {
             process::exit(0)
         }
     }
