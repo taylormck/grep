@@ -10,12 +10,18 @@ static ALPHANUMERIC_CHARACTERS: phf::Set<char> = phf_set! {
     '5', '6', '7', '8', '9', '_',
 };
 
-fn match_escape_pattern(input_line: &str, escape_pattern: &char) -> bool {
-    let char = input_line.chars().next().unwrap();
+static NUMUERIC_CHARACTERS: phf::Set<char> = phf_set! {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+};
 
+fn match_escape_pattern(input_line: &str, escape_pattern: &char) -> bool {
     match escape_pattern {
-        'd' => format!("{}", char).parse::<u32>().is_ok(),
-        'w' => ALPHANUMERIC_CHARACTERS.contains(&char),
+        'd' => input_line
+            .chars()
+            .any(|char| NUMUERIC_CHARACTERS.contains(&char)),
+        'w' => input_line
+            .chars()
+            .any(|char| ALPHANUMERIC_CHARACTERS.contains(&char)),
         _ => panic!("Unhandled escape pattern: {}", escape_pattern),
     }
 }
