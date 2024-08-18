@@ -1,7 +1,7 @@
 use phf::phf_set;
-use std::env;
-use std::io;
-use std::process;
+use std::{collections::HashSet, env, io, process};
+
+type PatternChars<'a> = std::iter::Peekable<core::str::Chars<'a>>;
 
 static ALPHANUMERIC_CHARACTERS: phf::Set<char> = phf_set! {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
@@ -21,7 +21,7 @@ static VALID_CHARACTERS: phf::Set<char> = phf_set! {
     '5', '6', '7', '8', '9', '_', '-', ' ',
 };
 
-fn match_escape_pattern(input_characters: &mut core::str::Chars, escape_pattern: &char) -> bool {
+fn match_escape_pattern(input_characters: &mut PatternChars, escape_pattern: &char) -> bool {
     if let Some(next_char) = input_characters.next() {
         match escape_pattern {
             'd' => NUMERIC_CHARACTERS.contains(&next_char),
@@ -34,13 +34,19 @@ fn match_escape_pattern(input_characters: &mut core::str::Chars, escape_pattern:
     }
 }
 
-fn match_pattern(input_characters: &mut core::str::Chars, pattern: &str) -> bool {
-    let mut pattern_characters = pattern.chars();
+fn match_pattern(input_characters: &mut PatternChars, pattern: &str) -> bool {
+    let mut pattern_characters = pattern.chars().peekable();
 
     while let Some(pattern_char) = pattern_characters.next() {
         if !match pattern_char {
             // Match our basic valid characters
-            c if VALID_CHARACTERS.contains(&c) => input_characters.next().unwrap() == pattern_char,
+            c if VALID_CHARACTERS.contains(&c) => {
+                if let Some(next_char) = input_characters.next() {
+                    next_char == pattern_char
+                } else {
+                    false
+                }
+            }
             // Match escape patterns
             '\\' => {
                 let sub_pattern = pattern_characters.next().unwrap();
@@ -48,22 +54,25 @@ fn match_pattern(input_characters: &mut core::str::Chars, pattern: &str) -> bool
             }
             // Match character groups
             '[' => {
-                // BUG: this will stop at the first ']' character, so it'll
-                // break if we have more than one character group.
-                if let Some(end_index) = pattern.find(']') {
-                    let sub_pattern = &pattern[1..end_index];
+                let negative_group = *pattern_characters.peek().unwrap() == '^';
 
-                    match sub_pattern.starts_with('^') {
-                        true => !sub_pattern[1..].chars().any(|character| {
-                            match_pattern(input_characters, &format!("{}", character))
-                        }),
+                let mut group_chars = HashSet::new();
+                for group_char in pattern_characters.by_ref() {
+                    match group_char {
+                        ']' => break,
+                        c => {
+                            group_chars.insert(c);
+                        }
+                    }
+                }
 
-                        false => sub_pattern.chars().any(|character| {
-                            match_pattern(input_characters, &format!("{}", character))
-                        }),
+                if let Some(next_char) = input_characters.next() {
+                    match negative_group {
+                        true => !group_chars.contains(&next_char),
+                        false => group_chars.contains(&next_char),
                     }
                 } else {
-                    panic!("Unmatched '['")
+                    false
                 }
             }
             _ => panic!("Unhandled symbol: {}", pattern_char),
@@ -87,12 +96,14 @@ fn main() {
 
     io::stdin().read_line(&mut input_line).unwrap();
 
-    let mut input_chars = input_line.chars();
+    let mut input_chars = input_line.chars().peekable();
 
-    while input_chars.next().is_some() {
+    while input_chars.peek().is_some() {
         if match_pattern(&mut input_chars.clone(), &pattern) {
             process::exit(0)
         }
+
+        input_chars.next();
     }
 
     process::exit(1)
