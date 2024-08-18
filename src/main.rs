@@ -98,13 +98,25 @@ fn main() {
 
     let mut input_chars = input_line.chars().peekable();
 
-    while input_chars.peek().is_some() {
-        if match_pattern(&mut input_chars.clone(), &pattern) {
-            process::exit(0)
+    match pattern.chars().next() {
+        Some('^') => {
+            if match_pattern(&mut input_chars.clone(), &pattern[1..]) {
+                process::exit(0);
+            }
         }
+        Some(_) => {
+            while input_chars.peek().is_some() {
+                if match_pattern(&mut input_chars.clone(), &pattern) {
+                    process::exit(0);
+                }
 
-        input_chars.next();
+                input_chars.next();
+            }
+        }
+        _ => {
+            process::exit(1);
+        }
     }
 
-    process::exit(1)
+    process::exit(1);
 }
