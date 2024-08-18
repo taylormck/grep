@@ -75,6 +75,18 @@ fn match_pattern(input_characters: &mut PatternChars, pattern: &str) -> bool {
                     false
                 }
             }
+            '$' => {
+                if let Some(next_char) = input_characters.next() {
+                    if next_char == '\n' {
+                        continue;
+                    }
+
+                    return false;
+                } else {
+                    continue;
+                };
+            }
+
             _ => panic!("Unhandled symbol: {}", pattern_char),
         } {
             return false;
