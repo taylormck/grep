@@ -106,6 +106,10 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
             '[' => {
                 let is_negative_group = *pattern_characters.peek().unwrap() == '^';
 
+                if is_negative_group {
+                    pattern_characters.next();
+                }
+
                 let mut group_chars = HashSet::new();
                 let mut found_closing_bracket = false;
 
