@@ -21,6 +21,145 @@ static VALID_CHARACTERS: phf::Set<char> = phf_set! {
     '5', '6', '7', '8', '9', '_', '-', ' ',
 };
 
+// Usage: echo <input_text> | your_program.sh -E <pattern>
+fn main() {
+    if env::args().nth(1).unwrap() != "-E" {
+        println!("Expected first argument to be '-E'");
+        process::exit(1);
+    }
+
+    let pattern = env::args().nth(2).unwrap();
+    let parsed_patterns = parse_patterns(&pattern);
+
+    let mut input_line = String::new();
+
+    io::stdin().read_line(&mut input_line).unwrap();
+
+    let mut input_chars = input_line.chars().peekable();
+
+    match parsed_patterns[0] {
+        Pattern::BeginningOfLine => {
+            if match_patterns(&mut input_chars.clone(), &parsed_patterns[1..]) {
+                process::exit(0);
+            }
+        }
+        _ => {
+            while input_chars.peek().is_some() {
+                if match_patterns(&mut input_chars.clone(), &parsed_patterns) {
+                    process::exit(0);
+                }
+
+                input_chars.next();
+            }
+        }
+    }
+
+    process::exit(1);
+}
+
+#[derive(Clone, Debug)]
+enum Pattern {
+    Character(char),
+    EscapeCharacter(char),
+    CharacterGroup {
+        characters: HashSet<char>,
+        positive: bool,
+    },
+    BeginningOfLine,
+    EndOfLine,
+}
+
+fn parse_patterns(pattern: &str) -> Vec<Pattern> {
+    let mut result: Vec<Pattern> = vec![];
+    let mut pattern_characters = pattern.chars().peekable();
+
+    while let Some(pattern_char) = pattern_characters.next() {
+        match pattern_char {
+            c if VALID_CHARACTERS.contains(&c) => result.push(Pattern::Character(c)),
+            '\\' => {
+                if let Some(next_char) = pattern_characters.next() {
+                    result.push(Pattern::EscapeCharacter(next_char))
+                }
+            }
+            '[' => {
+                let is_negative_group = *pattern_characters.peek().unwrap() == '^';
+
+                let mut group_chars = HashSet::new();
+                let mut found_closing_bracket = false;
+
+                for group_char in pattern_characters.by_ref() {
+                    match group_char {
+                        ']' => {
+                            found_closing_bracket = true;
+                            break;
+                        }
+                        c => {
+                            group_chars.insert(c);
+                        }
+                    }
+                }
+
+                if !found_closing_bracket {
+                    panic!("Character group never closed");
+                }
+
+                result.push(Pattern::CharacterGroup {
+                    characters: group_chars,
+                    positive: !is_negative_group,
+                });
+            }
+            '^' => result.push(Pattern::BeginningOfLine),
+            '$' => result.push(Pattern::EndOfLine),
+            _ => panic!("Unhandled symbol: {}", pattern_char),
+        }
+    }
+
+    result
+}
+
+fn match_patterns(input_characters: &mut PatternChars, patterns: &[Pattern]) -> bool {
+    patterns
+        .iter()
+        .all(|pattern| match_pattern(input_characters, pattern))
+}
+
+fn match_pattern(input_characters: &mut PatternChars, pattern: &Pattern) -> bool {
+    match pattern {
+        // Match our basic valid characters
+        Pattern::Character(c) => {
+            if let Some(next_char) = input_characters.next() {
+                &next_char == c
+            } else {
+                false
+            }
+        }
+        // Match escape patterns
+        Pattern::EscapeCharacter(c) => match_escape_pattern(input_characters, c),
+        // Match character groups
+        Pattern::CharacterGroup {
+            characters,
+            positive,
+        } => {
+            if let Some(next_char) = input_characters.next() {
+                match positive {
+                    true => characters.contains(&next_char),
+                    false => !characters.contains(&next_char),
+                }
+            } else {
+                false
+            }
+        }
+        Pattern::BeginningOfLine => false,
+        Pattern::EndOfLine => {
+            if let Some(next_char) = input_characters.next() {
+                next_char == '\n'
+            } else {
+                true
+            }
+        }
+    }
+}
+
 fn match_escape_pattern(input_characters: &mut PatternChars, escape_pattern: &char) -> bool {
     if let Some(next_char) = input_characters.next() {
         match escape_pattern {
@@ -32,103 +171,4 @@ fn match_escape_pattern(input_characters: &mut PatternChars, escape_pattern: &ch
     } else {
         false
     }
-}
-
-fn match_pattern(input_characters: &mut PatternChars, pattern: &str) -> bool {
-    let mut pattern_characters = pattern.chars().peekable();
-
-    while let Some(pattern_char) = pattern_characters.next() {
-        if !match pattern_char {
-            // Match our basic valid characters
-            c if VALID_CHARACTERS.contains(&c) => {
-                if let Some(next_char) = input_characters.next() {
-                    next_char == pattern_char
-                } else {
-                    false
-                }
-            }
-            // Match escape patterns
-            '\\' => {
-                let sub_pattern = pattern_characters.next().unwrap();
-                match_escape_pattern(input_characters, &sub_pattern)
-            }
-            // Match character groups
-            '[' => {
-                let negative_group = *pattern_characters.peek().unwrap() == '^';
-
-                let mut group_chars = HashSet::new();
-                for group_char in pattern_characters.by_ref() {
-                    match group_char {
-                        ']' => break,
-                        c => {
-                            group_chars.insert(c);
-                        }
-                    }
-                }
-
-                if let Some(next_char) = input_characters.next() {
-                    match negative_group {
-                        true => !group_chars.contains(&next_char),
-                        false => group_chars.contains(&next_char),
-                    }
-                } else {
-                    false
-                }
-            }
-            '$' => {
-                if let Some(next_char) = input_characters.next() {
-                    if next_char == '\n' {
-                        continue;
-                    }
-
-                    return false;
-                } else {
-                    continue;
-                };
-            }
-
-            _ => panic!("Unhandled symbol: {}", pattern_char),
-        } {
-            return false;
-        }
-    }
-
-    true
-}
-
-// Usage: echo <input_text> | your_program.sh -E <pattern>
-fn main() {
-    if env::args().nth(1).unwrap() != "-E" {
-        println!("Expected first argument to be '-E'");
-        process::exit(1);
-    }
-
-    let pattern = env::args().nth(2).unwrap();
-    let mut input_line = String::new();
-
-    io::stdin().read_line(&mut input_line).unwrap();
-
-    let mut input_chars = input_line.chars().peekable();
-
-    match pattern.chars().next() {
-        Some('^') => {
-            if match_pattern(&mut input_chars.clone(), &pattern[1..]) {
-                process::exit(0);
-            }
-        }
-        Some(_) => {
-            while input_chars.peek().is_some() {
-                if match_pattern(&mut input_chars.clone(), &pattern) {
-                    process::exit(0);
-                }
-
-                input_chars.next();
-            }
-        }
-        _ => {
-            process::exit(1);
-        }
-    }
-
-    process::exit(1);
 }
