@@ -20,7 +20,7 @@ static VALID_CHARACTERS: phf::Set<char> = phf_set! {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
     't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
     'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4',
-    '5', '6', '7', '8', '9', '_', '-', ' ',
+    '5', '6', '7', '8', '9', '_', '-', ' ', '*', '+', '|',
 };
 
 static VALID_ESCAPE_CHARACTERS: phf::Set<char> = phf_set! {
@@ -77,6 +77,8 @@ enum BasicPattern {
 enum Pattern {
     BasicPattern(BasicPattern),
     ZeroOrMore(Box<Pattern>),
+    Sequence(Vec<Pattern>),
+    Union(Vec<Pattern>),
 }
 
 #[derive(Clone, Debug)]
@@ -134,6 +136,38 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
 
                 result.push(Pattern::BasicPattern(BasicPattern::CharacterGroup(group)));
             }
+            '(' => {
+                let mut group_chars = Vec::<char>::new();
+                let mut found_closing_bracket = false;
+
+                for group_char in pattern_characters.by_ref() {
+                    match group_char {
+                        ')' => {
+                            found_closing_bracket = true;
+                            break;
+                        }
+                        c if VALID_CHARACTERS.contains(&c) => {
+                            group_chars.push(c);
+                        }
+                        c => panic!("Invalid character in character group: {}", c),
+                    }
+                }
+
+                if !found_closing_bracket {
+                    panic!("Character group never closed");
+                }
+
+                // let sub_pattern = parse_patterns(&group_chars.iter().collect::<String>());
+                let sequences = group_chars
+                    .iter()
+                    .collect::<String>()
+                    .split("|")
+                    .map(parse_patterns)
+                    .map(Pattern::Sequence)
+                    .collect();
+
+                result.push(Pattern::Union(sequences));
+            }
             '^' => result.push(Pattern::BasicPattern(BasicPattern::BeginningOfLine)),
             '$' => result.push(Pattern::BasicPattern(BasicPattern::EndOfLine)),
             '*' => {
@@ -183,6 +217,7 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
     while let Some(pattern) = patterns.next() {
         let matched: bool = match pattern {
             Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
+            // BUG: this isn't matching unions and sequences correctly
             Pattern::ZeroOrMore(pattern) => {
                 let mut stack = vec![input_characters.clone()];
                 let pattern = [*pattern.clone()];
@@ -201,6 +236,21 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
 
                 false
             }
+            Pattern::Sequence(patterns) => match_patterns(input_characters, &mut patterns.iter()),
+            Pattern::Union(patterns) => patterns.iter().any(|sub_pattern| {
+                let mut input_characters_clone = input_characters.clone();
+
+                let found_match = match_patterns(
+                    &mut input_characters_clone,
+                    &mut [sub_pattern.clone()].iter(),
+                );
+
+                if found_match {
+                    *input_characters = input_characters_clone;
+                }
+
+                found_match
+            }),
         };
 
         if !matched {
