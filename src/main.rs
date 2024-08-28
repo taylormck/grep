@@ -79,6 +79,7 @@ enum Pattern {
     ZeroOrMore(Box<Pattern>),
     Sequence(Vec<Pattern>),
     Union(Vec<Pattern>),
+    Empty,
 }
 
 #[derive(Clone, Debug)]
@@ -206,6 +207,24 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Cannot repeat at the beginning of the string");
                 }
             }
+            '?' => {
+                if let Some(previous_pattern) = result.pop() {
+                    match previous_pattern {
+                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                            panic!("Cannot make beginning of line optional",)
+                        }
+                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                            panic!("Cannot make end of line optional",)
+                        }
+                        Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
+                        pattern => {
+                            result.push(Pattern::Union(vec![pattern, Pattern::Empty]));
+                        }
+                    }
+                } else {
+                    panic!("Cannot repeat at the beginning of the string");
+                }
+            }
             '.' => result.push(Pattern::BasicPattern(BasicPattern::Wildcard)),
             c if VALID_CHARACTERS.contains(&c) => {
                 result.push(Pattern::BasicPattern(BasicPattern::Character(c)))
@@ -220,6 +239,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
 fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIter) -> bool {
     while let Some(pattern) = patterns.next() {
         let matched: bool = match pattern {
+            Pattern::Empty => true,
             Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
             Pattern::ZeroOrMore(pattern) => {
                 let mut stack = vec![input_characters.clone()];
