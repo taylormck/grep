@@ -145,6 +145,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
+                        Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
                         pattern => result.push(Pattern::ZeroOrMore(Box::new(pattern))),
                     }
                 } else {
@@ -160,6 +161,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
+                        Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
                         pattern => {
                             result.push(pattern.clone());
                             result.push(Pattern::ZeroOrMore(Box::new(pattern)));
