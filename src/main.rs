@@ -21,6 +21,10 @@ static VALID_CHARACTERS: phf::Set<char> = phf_set! {
     '5', '6', '7', '8', '9', '_', '-', ' ',
 };
 
+static VALID_ESCAPE_CHARACTERS: phf::Set<char> = phf_set! {
+    'd', 'w', '\\',
+};
+
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() {
     if env::args().nth(1).unwrap() != "-E" {
@@ -38,7 +42,7 @@ fn main() {
     let mut input_chars = input_line.chars().peekable();
 
     match parsed_patterns[0] {
-        Pattern::BeginningOfLine => {
+        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
             if match_patterns(&mut input_chars.clone(), &parsed_patterns[1..]) {
                 process::exit(0);
             }
@@ -58,7 +62,7 @@ fn main() {
 }
 
 #[derive(Clone, Debug)]
-enum Pattern {
+enum BasicPattern {
     Character(char),
     EscapeCharacter(char),
     CharacterGroup {
@@ -69,16 +73,29 @@ enum Pattern {
     EndOfLine,
 }
 
+#[derive(Clone, Debug)]
+enum Pattern {
+    BasicPattern(BasicPattern),
+    ZeroOrMore(BasicPattern),
+}
+
 fn parse_patterns(pattern: &str) -> Vec<Pattern> {
     let mut result: Vec<Pattern> = vec![];
     let mut pattern_characters = pattern.chars().peekable();
 
     while let Some(pattern_char) = pattern_characters.next() {
         match pattern_char {
-            c if VALID_CHARACTERS.contains(&c) => result.push(Pattern::Character(c)),
+            c if VALID_CHARACTERS.contains(&c) => {
+                result.push(Pattern::BasicPattern(BasicPattern::Character(c)))
+            }
             '\\' => {
                 if let Some(next_char) = pattern_characters.next() {
-                    result.push(Pattern::EscapeCharacter(next_char))
+                    match next_char {
+                        c if VALID_ESCAPE_CHARACTERS.contains(&c) => {
+                            result.push(Pattern::BasicPattern(BasicPattern::EscapeCharacter(c)))
+                        }
+                        c => panic!("Invalid escape character: {}", c),
+                    }
                 }
             }
             '[' => {
@@ -93,9 +110,10 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                             found_closing_bracket = true;
                             break;
                         }
-                        c => {
+                        c if VALID_CHARACTERS.contains(&c) => {
                             group_chars.insert(c);
                         }
+                        c => panic!("Invalid character in character group: {}", c),
                     }
                 }
 
@@ -103,13 +121,29 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Character group never closed");
                 }
 
-                result.push(Pattern::CharacterGroup {
+                result.push(Pattern::BasicPattern(BasicPattern::CharacterGroup {
                     characters: group_chars,
                     positive: !is_negative_group,
-                });
+                }));
             }
-            '^' => result.push(Pattern::BeginningOfLine),
-            '$' => result.push(Pattern::EndOfLine),
+            '^' => result.push(Pattern::BasicPattern(BasicPattern::BeginningOfLine)),
+            '$' => result.push(Pattern::BasicPattern(BasicPattern::EndOfLine)),
+            '*' => {
+                if let Some(previous_pattern) = result.pop() {
+                    match previous_pattern {
+                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                            panic!("Cannot repeat beginning of line",)
+                        }
+                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                            panic!("Cannot repeat end of line",)
+                        }
+                        Pattern::BasicPattern(pattern) => result.push(Pattern::ZeroOrMore(pattern)),
+                        _ => panic!("Cannot repeat pattern {:?}", previous_pattern),
+                    }
+                } else {
+                    panic!("Cannot repeat at the beginning of the string");
+                }
+            }
             _ => panic!("Unhandled symbol: {}", pattern_char),
         }
     }
@@ -118,15 +152,41 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
 }
 
 fn match_patterns(input_characters: &mut PatternChars, patterns: &[Pattern]) -> bool {
-    patterns
-        .iter()
-        .all(|pattern| match_pattern(input_characters, pattern))
+    let mut patterns_iter = patterns.iter();
+    while let Some(pattern) = patterns_iter.next() {
+        let matched: bool = match pattern {
+            Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
+            Pattern::ZeroOrMore(pattern) => {
+                let mut stack = vec![input_characters.clone()];
+
+                // Try to grab as many characters as possible, greedy style
+                while match_basic_pattern(input_characters, pattern) {
+                    stack.push(input_characters.clone());
+                }
+
+                let remaining_patterns: Vec<Pattern> = patterns_iter.clone().cloned().collect();
+
+                while let Some(mut remaining_input) = stack.pop() {
+                    if match_patterns(&mut remaining_input, remaining_patterns.as_slice()) {
+                        return true;
+                    }
+                }
+
+                false
+            }
+        };
+
+        if !matched {
+            return false;
+        }
+    }
+    true
 }
 
-fn match_pattern(input_characters: &mut PatternChars, pattern: &Pattern) -> bool {
+fn match_basic_pattern(input_characters: &mut PatternChars, pattern: &BasicPattern) -> bool {
     match pattern {
         // Match our basic valid characters
-        Pattern::Character(c) => {
+        BasicPattern::Character(c) => {
             if let Some(next_char) = input_characters.next() {
                 &next_char == c
             } else {
@@ -134,9 +194,9 @@ fn match_pattern(input_characters: &mut PatternChars, pattern: &Pattern) -> bool
             }
         }
         // Match escape patterns
-        Pattern::EscapeCharacter(c) => match_escape_pattern(input_characters, c),
+        BasicPattern::EscapeCharacter(c) => match_escape_pattern(input_characters, c),
         // Match character groups
-        Pattern::CharacterGroup {
+        BasicPattern::CharacterGroup {
             characters,
             positive,
         } => {
@@ -149,8 +209,8 @@ fn match_pattern(input_characters: &mut PatternChars, pattern: &Pattern) -> bool
                 false
             }
         }
-        Pattern::BeginningOfLine => false,
-        Pattern::EndOfLine => {
+        BasicPattern::BeginningOfLine => false,
+        BasicPattern::EndOfLine => {
             if let Some(next_char) = input_characters.next() {
                 next_char == '\n'
             } else {
