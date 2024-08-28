@@ -1,8 +1,9 @@
+use core::{slice, str};
 use phf::phf_set;
-use std::{collections::HashSet, env, io, process};
+use std::{boxed::Box, collections::HashSet, env, io, iter, process};
 
-type PatternChars<'a> = std::iter::Peekable<core::str::Chars<'a>>;
-type PatternsIter<'a> = std::slice::Iter<'a, Pattern>;
+type PatternChars<'a> = iter::Peekable<str::Chars<'a>>;
+type PatternsIter<'a> = slice::Iter<'a, Pattern>;
 
 static ALPHANUMERIC_CHARACTERS: phf::Set<char> = phf_set! {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
@@ -75,7 +76,7 @@ enum BasicPattern {
 #[derive(Clone, Debug)]
 enum Pattern {
     BasicPattern(BasicPattern),
-    ZeroOrMore(BasicPattern),
+    ZeroOrMore(Box<Pattern>),
 }
 
 #[derive(Clone, Debug)]
@@ -144,8 +145,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
-                        Pattern::BasicPattern(pattern) => result.push(Pattern::ZeroOrMore(pattern)),
-                        _ => panic!("Cannot repeat pattern {:?}", previous_pattern),
+                        pattern => result.push(Pattern::ZeroOrMore(Box::new(pattern))),
                     }
                 } else {
                     panic!("Cannot repeat at the beginning of the string");
@@ -160,11 +160,10 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
-                        Pattern::BasicPattern(pattern) => {
-                            result.push(Pattern::BasicPattern(pattern.clone()));
-                            result.push(Pattern::ZeroOrMore(pattern));
+                        pattern => {
+                            result.push(pattern.clone());
+                            result.push(Pattern::ZeroOrMore(Box::new(pattern)));
                         }
-                        _ => panic!("Cannot repeat pattern {:?}", previous_pattern),
                     }
                 } else {
                     panic!("Cannot repeat at the beginning of the string");
@@ -184,9 +183,10 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
             Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
             Pattern::ZeroOrMore(pattern) => {
                 let mut stack = vec![input_characters.clone()];
+                let pattern = [*pattern.clone()];
 
                 // Try to grab as many characters as possible, greedy style
-                while match_basic_pattern(input_characters, pattern) {
+                while match_patterns(input_characters, &mut pattern.iter()) {
                     stack.push(input_characters.clone());
                 }
 
