@@ -93,9 +93,6 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
 
     while let Some(pattern_char) = pattern_characters.next() {
         match pattern_char {
-            c if VALID_CHARACTERS.contains(&c) => {
-                result.push(Pattern::BasicPattern(BasicPattern::Character(c)))
-            }
             '\\' => {
                 if let Some(next_char) = pattern_characters.next() {
                     match next_char {
@@ -206,6 +203,9 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                 }
             }
             '.' => result.push(Pattern::BasicPattern(BasicPattern::Wildcard)),
+            c if VALID_CHARACTERS.contains(&c) => {
+                result.push(Pattern::BasicPattern(BasicPattern::Character(c)))
+            }
             _ => panic!("Unhandled symbol: {}", pattern_char),
         }
     }
@@ -217,7 +217,6 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
     while let Some(pattern) = patterns.next() {
         let matched: bool = match pattern {
             Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
-            // BUG: this isn't matching unions and sequences correctly
             Pattern::ZeroOrMore(pattern) => {
                 let mut stack = vec![input_characters.clone()];
                 let pattern = [*pattern.clone()];
