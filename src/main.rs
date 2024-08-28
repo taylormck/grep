@@ -2,6 +2,7 @@ use phf::phf_set;
 use std::{collections::HashSet, env, io, process};
 
 type PatternChars<'a> = std::iter::Peekable<core::str::Chars<'a>>;
+type PatternsIter<'a> = std::slice::Iter<'a, Pattern>;
 
 static ALPHANUMERIC_CHARACTERS: phf::Set<char> = phf_set! {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
@@ -43,13 +44,13 @@ fn main() {
 
     match parsed_patterns[0] {
         Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
-            if match_patterns(&mut input_chars.clone(), &parsed_patterns[1..]) {
+            if match_patterns(&mut input_chars.clone(), &mut parsed_patterns[1..].iter()) {
                 process::exit(0);
             }
         }
         _ => {
             while input_chars.peek().is_some() {
-                if match_patterns(&mut input_chars.clone(), &parsed_patterns) {
+                if match_patterns(&mut input_chars.clone(), &mut parsed_patterns.iter()) {
                     process::exit(0);
                 }
 
@@ -65,10 +66,7 @@ fn main() {
 enum BasicPattern {
     Character(char),
     EscapeCharacter(char),
-    CharacterGroup {
-        characters: HashSet<char>,
-        positive: bool,
-    },
+    CharacterGroup(CharacterGroup),
     BeginningOfLine,
     EndOfLine,
     Wildcard,
@@ -78,6 +76,12 @@ enum BasicPattern {
 enum Pattern {
     BasicPattern(BasicPattern),
     ZeroOrMore(BasicPattern),
+}
+
+#[derive(Clone, Debug)]
+struct CharacterGroup {
+    characters: HashSet<char>,
+    positive: bool,
 }
 
 fn parse_patterns(pattern: &str) -> Vec<Pattern> {
@@ -122,10 +126,12 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Character group never closed");
                 }
 
-                result.push(Pattern::BasicPattern(BasicPattern::CharacterGroup {
+                let group = CharacterGroup {
                     characters: group_chars,
                     positive: !is_negative_group,
-                }));
+                };
+
+                result.push(Pattern::BasicPattern(BasicPattern::CharacterGroup(group)));
             }
             '^' => result.push(Pattern::BasicPattern(BasicPattern::BeginningOfLine)),
             '$' => result.push(Pattern::BasicPattern(BasicPattern::EndOfLine)),
@@ -172,9 +178,8 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
     result
 }
 
-fn match_patterns(input_characters: &mut PatternChars, patterns: &[Pattern]) -> bool {
-    let mut patterns_iter = patterns.iter();
-    while let Some(pattern) = patterns_iter.next() {
+fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIter) -> bool {
+    while let Some(pattern) = patterns.next() {
         let matched: bool = match pattern {
             Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
             Pattern::ZeroOrMore(pattern) => {
@@ -185,10 +190,9 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &[Pattern]) -> 
                     stack.push(input_characters.clone());
                 }
 
-                let remaining_patterns: Vec<Pattern> = patterns_iter.clone().cloned().collect();
-
+                // Work our way back down the stack until we match the rest of the input
                 while let Some(mut remaining_input) = stack.pop() {
-                    if match_patterns(&mut remaining_input, remaining_patterns.as_slice()) {
+                    if match_patterns(&mut remaining_input, &mut patterns.clone()) {
                         return true;
                     }
                 }
@@ -201,62 +205,41 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &[Pattern]) -> 
             return false;
         }
     }
+
     true
 }
 
 fn match_basic_pattern(input_characters: &mut PatternChars, pattern: &BasicPattern) -> bool {
+    let next_char = input_characters.next();
+
+    if next_char.is_none() {
+        return matches!(pattern, BasicPattern::EndOfLine);
+    }
+
+    let next_char = next_char.unwrap();
+
     match pattern {
-        // Match our basic valid characters
-        BasicPattern::Character(c) => {
-            if let Some(next_char) = input_characters.next() {
-                &next_char == c
-            } else {
-                false
-            }
-        }
-        // Match escape patterns
-        BasicPattern::EscapeCharacter(c) => match_escape_pattern(input_characters, c),
-        // Match character groups
-        BasicPattern::CharacterGroup {
-            characters,
-            positive,
-        } => {
-            if let Some(next_char) = input_characters.next() {
-                match positive {
-                    true => characters.contains(&next_char),
-                    false => !characters.contains(&next_char),
-                }
-            } else {
-                false
-            }
-        }
+        BasicPattern::Character(c) => &next_char == c,
+        BasicPattern::EscapeCharacter(c) => match_escape_pattern(next_char, c),
+        BasicPattern::CharacterGroup(group) => match_character_group(next_char, group),
         BasicPattern::BeginningOfLine => false,
-        BasicPattern::EndOfLine => {
-            if let Some(next_char) = input_characters.next() {
-                next_char == '\n'
-            } else {
-                true
-            }
-        }
-        BasicPattern::Wildcard => {
-            if let Some(next_char) = input_characters.next() {
-                VALID_CHARACTERS.contains(&next_char)
-            } else {
-                false
-            }
-        }
+        BasicPattern::EndOfLine => next_char == '\n',
+        BasicPattern::Wildcard => VALID_CHARACTERS.contains(&next_char),
     }
 }
 
-fn match_escape_pattern(input_characters: &mut PatternChars, escape_pattern: &char) -> bool {
-    if let Some(next_char) = input_characters.next() {
-        match escape_pattern {
-            'd' => NUMERIC_CHARACTERS.contains(&next_char),
-            'w' => ALPHANUMERIC_CHARACTERS.contains(&next_char),
-            '\\' => next_char == '\\',
-            _ => panic!("Unhandled escape pattern: {}", escape_pattern),
-        }
-    } else {
-        false
+fn match_escape_pattern(next_char: char, escape_pattern: &char) -> bool {
+    match escape_pattern {
+        'd' => NUMERIC_CHARACTERS.contains(&next_char),
+        'w' => ALPHANUMERIC_CHARACTERS.contains(&next_char),
+        '\\' => next_char == '\\',
+        _ => panic!("Unhandled escape pattern: {}", escape_pattern),
+    }
+}
+
+fn match_character_group(next_char: char, group: &CharacterGroup) -> bool {
+    match group.positive {
+        true => group.characters.contains(&next_char),
+        false => !group.characters.contains(&next_char),
     }
 }
