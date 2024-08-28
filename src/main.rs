@@ -144,6 +144,25 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Cannot repeat at the beginning of the string");
                 }
             }
+            '+' => {
+                if let Some(previous_pattern) = result.pop() {
+                    match previous_pattern {
+                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                            panic!("Cannot repeat beginning of line",)
+                        }
+                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                            panic!("Cannot repeat end of line",)
+                        }
+                        Pattern::BasicPattern(pattern) => {
+                            result.push(Pattern::BasicPattern(pattern.clone()));
+                            result.push(Pattern::ZeroOrMore(pattern));
+                        }
+                        _ => panic!("Cannot repeat pattern {:?}", previous_pattern),
+                    }
+                } else {
+                    panic!("Cannot repeat at the beginning of the string");
+                }
+            }
             _ => panic!("Unhandled symbol: {}", pattern_char),
         }
     }
