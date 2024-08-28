@@ -71,6 +71,7 @@ enum BasicPattern {
     },
     BeginningOfLine,
     EndOfLine,
+    Wildcard,
 }
 
 #[derive(Clone, Debug)]
@@ -163,6 +164,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Cannot repeat at the beginning of the string");
                 }
             }
+            '.' => result.push(Pattern::BasicPattern(BasicPattern::Wildcard)),
             _ => panic!("Unhandled symbol: {}", pattern_char),
         }
     }
@@ -234,6 +236,13 @@ fn match_basic_pattern(input_characters: &mut PatternChars, pattern: &BasicPatte
                 next_char == '\n'
             } else {
                 true
+            }
+        }
+        BasicPattern::Wildcard => {
+            if let Some(next_char) = input_characters.next() {
+                VALID_CHARACTERS.contains(&next_char)
+            } else {
+                false
             }
         }
     }
