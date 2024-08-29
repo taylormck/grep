@@ -253,6 +253,8 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
                 // Work our way back down the stack until we match the rest of the input
                 while let Some(mut remaining_input) = stack.pop() {
                     if match_patterns(&mut remaining_input, &mut patterns.clone()) {
+                        //  Empty the iterator
+                        for _ in patterns {}
                         return true;
                     }
                 }
@@ -260,19 +262,22 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
                 false
             }
             Pattern::Sequence(patterns) => match_patterns(input_characters, &mut patterns.iter()),
-            Pattern::Union(patterns) => patterns.iter().any(|sub_pattern| {
+            Pattern::Union(union_patterns) => union_patterns.iter().any(|sub_pattern| {
+                let mut remaining_patterns = vec![sub_pattern.clone()];
+                remaining_patterns.extend(patterns.clone().cloned());
+
                 let mut input_characters_clone = input_characters.clone();
 
-                let found_match = match_patterns(
+                if match_patterns(
                     &mut input_characters_clone,
-                    &mut [sub_pattern.clone()].iter(),
-                );
-
-                if found_match {
-                    *input_characters = input_characters_clone;
+                    &mut remaining_patterns.as_slice().iter(),
+                ) {
+                    //  Empty the iterator
+                    for _ in &mut *patterns {}
+                    return true;
                 }
 
-                found_match
+                false
             }),
         };
 
