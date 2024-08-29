@@ -44,7 +44,7 @@ fn main() {
     let mut input_chars = input_line.chars().peekable();
 
     match parsed_patterns[0] {
-        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+        Pattern::Basic(BasicPattern::BeginningOfLine) => {
             if match_patterns(&mut input_chars.clone(), &mut parsed_patterns[1..].iter()) {
                 process::exit(0);
             }
@@ -75,7 +75,7 @@ enum BasicPattern {
 
 #[derive(Clone, Debug)]
 enum Pattern {
-    BasicPattern(BasicPattern),
+    Basic(BasicPattern),
     ZeroOrMore(Box<Pattern>),
     Sequence(Vec<Pattern>),
     Union(Vec<Pattern>),
@@ -98,7 +98,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                 if let Some(next_char) = pattern_characters.next() {
                     match next_char {
                         c if VALID_ESCAPE_CHARACTERS.contains(&c) => {
-                            result.push(Pattern::BasicPattern(BasicPattern::EscapeCharacter(c)))
+                            result.push(Pattern::Basic(BasicPattern::EscapeCharacter(c)))
                         }
                         c => panic!("Invalid escape character: {}", c),
                     }
@@ -136,7 +136,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     positive: !is_negative_group,
                 };
 
-                result.push(Pattern::BasicPattern(BasicPattern::CharacterGroup(group)));
+                result.push(Pattern::Basic(BasicPattern::CharacterGroup(group)));
             }
             '(' => {
                 let mut group_chars = Vec::<char>::new();
@@ -170,15 +170,15 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
 
                 result.push(Pattern::Union(sequences));
             }
-            '^' => result.push(Pattern::BasicPattern(BasicPattern::BeginningOfLine)),
-            '$' => result.push(Pattern::BasicPattern(BasicPattern::EndOfLine)),
+            '^' => result.push(Pattern::Basic(BasicPattern::BeginningOfLine)),
+            '$' => result.push(Pattern::Basic(BasicPattern::EndOfLine)),
             '*' => {
                 if let Some(previous_pattern) = result.pop() {
                     match previous_pattern {
-                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                        Pattern::Basic(BasicPattern::BeginningOfLine) => {
                             panic!("Cannot repeat beginning of line",)
                         }
-                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                        Pattern::Basic(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
                         Pattern::Union(_) => panic!("Repeating unions is not yet supported"),
@@ -192,10 +192,10 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
             '+' => {
                 if let Some(previous_pattern) = result.pop() {
                     match previous_pattern {
-                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                        Pattern::Basic(BasicPattern::BeginningOfLine) => {
                             panic!("Cannot repeat beginning of line",)
                         }
-                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                        Pattern::Basic(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
                         Pattern::Union(_) => panic!("Repeating unions is not yet supported"),
@@ -212,10 +212,10 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
             '?' => {
                 if let Some(previous_pattern) = result.pop() {
                     match previous_pattern {
-                        Pattern::BasicPattern(BasicPattern::BeginningOfLine) => {
+                        Pattern::Basic(BasicPattern::BeginningOfLine) => {
                             panic!("Cannot make beginning of line optional",)
                         }
-                        Pattern::BasicPattern(BasicPattern::EndOfLine) => {
+                        Pattern::Basic(BasicPattern::EndOfLine) => {
                             panic!("Cannot make end of line optional",)
                         }
                         Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
@@ -227,9 +227,9 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                     panic!("Cannot repeat at the beginning of the string");
                 }
             }
-            '.' => result.push(Pattern::BasicPattern(BasicPattern::Wildcard)),
+            '.' => result.push(Pattern::Basic(BasicPattern::Wildcard)),
             c if VALID_CHARACTERS.contains(&c) => {
-                result.push(Pattern::BasicPattern(BasicPattern::Character(c)))
+                result.push(Pattern::Basic(BasicPattern::Character(c)))
             }
             _ => panic!("Unhandled symbol: {}", pattern_char),
         }
@@ -242,7 +242,7 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
     while let Some(pattern) = patterns.next() {
         let matched: bool = match pattern {
             Pattern::Empty => true,
-            Pattern::BasicPattern(pattern) => match_basic_pattern(input_characters, pattern),
+            Pattern::Basic(pattern) => match_basic_pattern(input_characters, pattern),
             Pattern::ZeroOrMore(pattern) => {
                 let mut stack = vec![input_characters.clone()];
                 let pattern = [*pattern.clone()];
