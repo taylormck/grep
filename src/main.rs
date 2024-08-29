@@ -181,6 +181,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
+                        Pattern::Union(_) => panic!("Repeating unions is not yet supported"),
                         Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
                         pattern => result.push(Pattern::ZeroOrMore(Box::new(pattern))),
                     }
@@ -197,6 +198,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         Pattern::BasicPattern(BasicPattern::EndOfLine) => {
                             panic!("Cannot repeat end of line",)
                         }
+                        Pattern::Union(_) => panic!("Repeating unions is not yet supported"),
                         Pattern::ZeroOrMore(_) => panic!("Cannot repeat recursively"),
                         pattern => {
                             result.push(pattern.clone());
