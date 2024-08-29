@@ -139,36 +139,64 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                 result.push(Pattern::Basic(BasicPattern::CharacterGroup(group)));
             }
             '(' => {
-                let mut group_chars = Vec::<char>::new();
+                let mut chars_so_far = Vec::<char>::new();
                 let mut found_closing_bracket = false;
+                let mut num_opening_brackets = 0;
+                let mut sequences = Vec::<Pattern>::new();
 
-                for group_char in pattern_characters.by_ref() {
+                let mut push_sequence = |chars: &str| {
+                    let pattern = match !chars.contains("(") && chars.contains("|") {
+                        true => Pattern::Union(
+                            chars
+                                .split("|")
+                                .map(parse_patterns)
+                                .map(Pattern::Sequence)
+                                .collect::<Vec<Pattern>>(),
+                        ),
+                        false => Pattern::Sequence(parse_patterns(chars)),
+                    };
+
+                    sequences.push(pattern);
+                };
+
+                while let Some(group_char) = pattern_characters.peek() {
                     match group_char {
-                        ')' => {
-                            found_closing_bracket = true;
-                            break;
+                        '(' => {
+                            if num_opening_brackets == 0 {
+                                let chars = chars_so_far.iter().collect::<String>();
+                                push_sequence(chars.as_str());
+                                chars_so_far.clear();
+                            }
+                            num_opening_brackets += 1;
+                            chars_so_far.push('(');
                         }
-                        c if VALID_CHARACTERS.contains(&c) => {
-                            group_chars.push(c);
+                        ')' => {
+                            if num_opening_brackets == 0 {
+                                found_closing_bracket = true;
+
+                                let chars = chars_so_far.iter().collect::<String>();
+
+                                push_sequence(chars.as_str());
+                                pattern_characters.next();
+                                break;
+                            } else {
+                                chars_so_far.push(')');
+                                num_opening_brackets -= 1;
+                            }
+                        }
+                        c if VALID_CHARACTERS.contains(c) => {
+                            chars_so_far.push(*c);
                         }
                         c => panic!("Invalid character in character group: {}", c),
                     }
+                    pattern_characters.next();
                 }
 
                 if !found_closing_bracket {
                     panic!("Character group never closed");
                 }
 
-                // let sub_pattern = parse_patterns(&group_chars.iter().collect::<String>());
-                let sequences = group_chars
-                    .iter()
-                    .collect::<String>()
-                    .split("|")
-                    .map(parse_patterns)
-                    .map(Pattern::Sequence)
-                    .collect();
-
-                result.push(Pattern::Union(sequences));
+                result.extend(sequences);
             }
             '^' => result.push(Pattern::Basic(BasicPattern::BeginningOfLine)),
             '$' => result.push(Pattern::Basic(BasicPattern::EndOfLine)),
