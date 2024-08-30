@@ -36,6 +36,7 @@ fn main() {
 
     let pattern = env::args().nth(2).unwrap();
     let parsed_patterns = parse_patterns(&pattern);
+    dbg!(&parsed_patterns);
 
     let mut input_line = String::new();
 
@@ -79,6 +80,7 @@ enum Pattern {
     ZeroOrMore(Box<Pattern>),
     Sequence(Vec<Pattern>),
     Union(Vec<Pattern>),
+    Backreference(usize),
     Empty,
 }
 
@@ -95,6 +97,27 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
     while let Some(pattern_char) = pattern_characters.next() {
         match pattern_char {
             '\\' => {
+                // First, check for a backreference number
+                let mut digits = Vec::<char>::new();
+                while let Some(digit) = pattern_characters.peek() {
+                    if NUMERIC_CHARACTERS.contains(digit) {
+                        digits.push(*digit);
+                        pattern_characters.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                if !digits.is_empty() {
+                    dbg!(&digits);
+                    if let Ok(number) = digits.iter().collect::<String>().parse::<usize>() {
+                        dbg!(number);
+                        result.push(Pattern::Backreference(number));
+                        continue;
+                    }
+                }
+
+                // Not a number, so check for escape characters
                 if let Some(next_char) = pattern_characters.next() {
                     match next_char {
                         c if VALID_ESCAPE_CHARACTERS.contains(&c) => {
@@ -175,8 +198,8 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                                 found_closing_bracket = true;
 
                                 let chars = chars_so_far.iter().collect::<String>();
-
                                 push_sequence(chars.as_str());
+
                                 pattern_characters.next();
                                 break;
                             } else {
@@ -309,6 +332,7 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
 
                 false
             }),
+            Pattern::Backreference(_pattern) => false,
         };
 
         if !matched {
