@@ -23,25 +23,19 @@ fn main() {
     io::stdin().read_line(&mut input).unwrap();
 
     let pattern_tokens = token::tokenize(&pattern);
-    let expression = expression::parse(pattern_tokens);
+    let expression = expression::parse(&pattern_tokens);
 
-    dbg!(expression);
+    dbg!(pattern_tokens, &expression);
+
+    match expression::evaluate(&expression, &input) {
+        Some(result) => {
+            println!("Match found: {}", result);
+        }
+        None => {
+            println!("No match!");
+            process::exit(1);
+        }
+    }
 
     process::exit(1);
 }
-
-// fn match_escape_pattern(next_char: char, escape_pattern: &char) -> bool {
-//     match escape_pattern {
-//         'd' => NUMERIC_CHARACTERS.contains(&next_char),
-//         'w' => ALPHANUMERIC_CHARACTERS.contains(&next_char),
-//         '\\' => next_char == '\\',
-//         _ => panic!("Unhandled escape pattern: {}", escape_pattern),
-//     }
-// }
-//
-// fn match_character_group(next_char: char, group: &CharacterGroup) -> bool {
-//     match group.positive {
-//         true => group.characters.contains(&next_char),
-//         false => !group.characters.contains(&next_char),
-//     }
-// }
