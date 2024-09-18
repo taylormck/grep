@@ -1,9 +1,6 @@
 use grep_starter_rust::{evaluate, parse, token};
 use std::{env, io, process};
 
-// type PatternChas<'a> = std::iter::Peekable<str::Chars<'a>>;
-// type PatternsIter<'a> = core::slice::Iter<'a, Pattern>;
-
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() {
     if env::args().nth(1).unwrap() != "-E" {

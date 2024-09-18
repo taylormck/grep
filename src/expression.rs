@@ -15,5 +15,5 @@ pub enum Expression {
     Optional(Box<Expression>),
     Wildcard,
     Alternation(Vec<Expression>),
-    BackReference(u8),
+    BackReference(usize),
 }

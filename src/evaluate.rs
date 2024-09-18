@@ -3,9 +3,10 @@ type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 
 pub fn evaluate(expression: &Expression, input: &str) -> Option<String> {
     let mut chars = input.chars().peekable();
+    let mut backreferences: Vec<String> = Vec::new();
 
     while chars.peek().is_some() {
-        match evaluate_from_beginning(expression, &mut chars.clone()) {
+        match evaluate_from_beginning(expression, &mut chars.clone(), &mut backreferences) {
             Some(result) => {
                 return Some(result);
             }
@@ -17,7 +18,11 @@ pub fn evaluate(expression: &Expression, input: &str) -> Option<String> {
     None
 }
 
-fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Option<String> {
+fn evaluate_from_beginning(
+    expression: &Expression,
+    chars: &mut CharIter,
+    backreferences: &mut Vec<String>,
+) -> Option<String> {
     match expression {
         Expression::Empty => Some("".to_string()),
         Expression::Sequence(expressions) => {
@@ -30,7 +35,9 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
                     Expression::Repeat(repeated_expr) => {
                         let mut stack = vec![("".to_string(), chars.clone())];
 
-                        while let Some(result) = evaluate_from_beginning(repeated_expr, chars) {
+                        while let Some(result) =
+                            evaluate_from_beginning(repeated_expr, chars, backreferences)
+                        {
                             stack.push((result, chars.clone()));
                         }
 
@@ -47,6 +54,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
                             if let Some(result) = evaluate_from_beginning(
                                 &remaining_expressions,
                                 &mut remaining_input,
+                                &mut backreferences.clone(),
                             ) {
                                 results.push(matched_str);
                                 results.push(result);
@@ -58,7 +66,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
                         return None;
                     }
 
-                    _ => match evaluate_from_beginning(expr, chars) {
+                    _ => match evaluate_from_beginning(expr, chars, backreferences) {
                         Some(result) => {
                             results.push(result);
                         }
@@ -73,7 +81,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
         }
         Expression::Literal(c) => match chars.next() {
             Some(next_char) if next_char == *c => Some(String::from(*c)),
-            Some('\n') => evaluate_from_beginning(expression, chars),
+            Some('\n') => evaluate_from_beginning(expression, chars, backreferences),
             _ => None,
         },
         Expression::Wildcard => match chars.next() {
@@ -86,7 +94,14 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
             Some(next_char) if match_escape_pattern(next_char, c) => Some(String::from(next_char)),
             _ => None,
         },
-        Expression::Capture(expr) => evaluate_from_beginning(expr, chars),
+        Expression::Capture(expr) => match evaluate_from_beginning(expr, chars, backreferences) {
+            Some(result) => {
+                backreferences.push(result.clone());
+                Some(result)
+            }
+            _ => None,
+        },
+
         Expression::CharacterGroup(group) => match chars.next() {
             Some(next_char) if group.contains(&next_char) => Some(String::from(next_char)),
             _ => None,
@@ -107,7 +122,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
         Expression::Optional(expr) => {
             let mut forward_chars = chars.clone();
 
-            match evaluate_from_beginning(expr, &mut forward_chars) {
+            match evaluate_from_beginning(expr, &mut forward_chars, backreferences) {
                 Some(result) => {
                     *chars = forward_chars;
                     Some(result)
@@ -118,7 +133,9 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
         Expression::Alternation(exprs) => {
             for expr in exprs {
                 let mut forward_chars = chars.clone();
-                if let Some(result) = evaluate_from_beginning(expr, &mut forward_chars) {
+                if let Some(result) =
+                    evaluate_from_beginning(expr, &mut forward_chars, backreferences)
+                {
                     *chars = forward_chars;
                     return Some(result);
                 }
@@ -126,7 +143,15 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
 
             None
         }
-        Expression::BackReference(_num) => None,
+        Expression::BackReference(num) => match backreferences.get(num - 1) {
+            Some(backreference) => {
+                let exprs = backreference.chars().map(Expression::Literal).collect();
+                let expr = Expression::Sequence(exprs);
+
+                evaluate_from_beginning(&expr, chars, backreferences)
+            }
+            _ => None,
+        },
     }
 }
 
