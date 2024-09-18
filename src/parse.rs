@@ -44,6 +44,7 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
         Token::Literal(c) => Expression::Literal(*c),
         Token::Caret => Expression::BeginningOfLine,
         Token::Dollar => Expression::EndOfLine,
+        Token::Dot => Expression::Wildcard,
         Token::BackSlash => {
             if let Some(token) = tokens.next() {
                 return match token {

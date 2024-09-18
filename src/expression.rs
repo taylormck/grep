@@ -13,4 +13,5 @@ pub enum Expression {
     EndOfLine,
     Repeat(Box<Expression>),
     Optional(Box<Expression>),
+    Wildcard,
 }
