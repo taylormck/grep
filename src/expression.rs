@@ -14,4 +14,5 @@ pub enum Expression {
     Repeat(Box<Expression>),
     Optional(Box<Expression>),
     Wildcard,
+    Alternation(Vec<Expression>),
 }

@@ -17,7 +17,7 @@ pub fn parse(tokens: &[Token]) -> Expression {
 }
 
 fn parse_unary(token: &Token, tokens: &mut TokenIter) -> Expression {
-    let mut lhs = parse_token(token, tokens);
+    let mut lhs = parse_base_token(token, tokens);
 
     while let Some(token) = tokens.peek() {
         match token {
@@ -39,7 +39,7 @@ fn parse_unary(token: &Token, tokens: &mut TokenIter) -> Expression {
     lhs
 }
 
-fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
+fn parse_base_token(token: &Token, tokens: &mut TokenIter) -> Expression {
     match token {
         Token::Literal(c) => Expression::Literal(*c),
         Token::Caret => Expression::BeginningOfLine,
@@ -60,19 +60,33 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
         }
         Token::OpenParen => {
             let mut inner_expressions: Vec<Expression> = vec![];
+            let mut current_expression: Vec<Expression> = vec![];
 
             loop {
                 match tokens.next() {
-                    Some(Token::CloseParen) => break,
-                    Some(token) => {
-                        let expr = parse_token(token, tokens);
+                    Some(Token::CloseParen) => {
+                        let expr = Expression::Sequence(current_expression);
                         inner_expressions.push(expr);
+
+                        break;
+                    }
+                    Some(Token::Pipe) => {
+                        let expr = Expression::Sequence(current_expression);
+                        inner_expressions.push(expr);
+                        current_expression = vec![];
+                    }
+
+                    Some(token) => {
+                        let expr = parse_unary(token, tokens);
+                        current_expression.push(expr);
                     }
                     None => panic!("Unended capture group!"),
                 }
             }
 
-            Expression::Capture(Box::from(Expression::Sequence(inner_expressions)))
+            let expr = Expression::Alternation(inner_expressions);
+
+            Expression::Capture(Box::from(expr))
         }
         Token::OpenBracket => {
             let mut group_chars: HashSet<char> = HashSet::new();
@@ -103,6 +117,6 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
                 false => Expression::CharacterGroup(group_chars),
             }
         }
-        _ => todo!(),
+        token => panic!("Invalid base token: {:?}", token),
     }
 }
