@@ -23,25 +23,61 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
         Expression::Sequence(expressions) => {
             let mut results: Vec<String> = vec![];
 
-            for expr in expressions {
-                match evaluate_from_beginning(expr, chars) {
-                    Some(result) => {
-                        results.push(result);
-                    }
-                    None => {
+            let mut remaining_expressions = expressions.iter();
+
+            while let Some(expr) = remaining_expressions.next() {
+                match expr {
+                    Expression::Repeat(repeated_expr) => {
+                        dbg!(repeated_expr, chars.clone().collect::<String>());
+                        let mut stack = vec![("".to_string(), chars.clone())];
+
+                        while let Some(result) = evaluate_from_beginning(repeated_expr, chars) {
+                            eprintln!("Hello");
+                            stack.push((result, chars.clone()));
+                        }
+
+                        let remaining_expressions: Vec<Expression> =
+                            remaining_expressions.clone().cloned().collect();
+
+                        let remaining_expressions = match remaining_expressions.len() {
+                            0 => Expression::Empty,
+                            _ => Expression::Sequence(remaining_expressions),
+                        };
+
+                        // Work our way back down the stack until we match the rest of the input
+                        while let Some((matched_str, mut remaining_input)) = stack.pop() {
+                            if let Some(result) = evaluate_from_beginning(
+                                &remaining_expressions,
+                                &mut remaining_input,
+                            ) {
+                                results.push(matched_str);
+                                results.push(result);
+
+                                return Some(results.iter().map(String::from).collect());
+                            }
+                        }
+
                         return None;
                     }
+
+                    _ => match evaluate_from_beginning(expr, chars) {
+                        Some(result) => {
+                            // dbg!(&result);
+                            results.push(result);
+                        }
+                        None => {
+                            return None;
+                        }
+                    },
                 }
             }
+            dbg!(&results);
 
             Some(results.iter().map(String::from).collect())
         }
         Expression::Literal(c) => match chars.next() {
             Some(next_char) if next_char == *c => Some(String::from(*c)),
-            Some(next_char) => {
-                dbg!(c, next_char);
-                None
-            }
+            Some('\n') => evaluate_from_beginning(expression, chars),
             _ => None,
         },
         Expression::Escape(c) => match chars.next() {
@@ -65,6 +101,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
             Some('\n') => Some("".to_string()),
             _ => None,
         },
+        Expression::Repeat(_) => None,
     }
 }
 

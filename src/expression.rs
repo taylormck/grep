@@ -11,4 +11,5 @@ pub enum Expression {
     NegativeCharacterGroup(HashSet<char>),
     BeginningOfLine,
     EndOfLine,
+    Repeat(Box<Expression>),
 }

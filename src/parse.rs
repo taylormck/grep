@@ -9,11 +9,31 @@ pub fn parse(tokens: &[Token]) -> Expression {
     let mut tokens = tokens.iter().peekable();
 
     while let Some(token) = tokens.next() {
-        let expr = parse_token(token, &mut tokens);
+        let expr = parse_unary(token, &mut tokens);
         expressions.push(expr);
     }
 
     Expression::Sequence(expressions)
+}
+
+fn parse_unary(token: &Token, tokens: &mut TokenIter) -> Expression {
+    let mut lhs = parse_token(token, tokens);
+
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::Star => {
+                lhs = Expression::Repeat(Box::from(lhs));
+                tokens.next();
+            }
+            Token::Plus => {
+                lhs = Expression::Sequence(vec![lhs.clone(), Expression::Repeat(Box::from(lhs))]);
+                tokens.next();
+            }
+            _ => break,
+        };
+    }
+
+    lhs
 }
 
 fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
