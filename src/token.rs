@@ -15,6 +15,7 @@ pub enum Token {
     CloseBracket,
     Dot,
     Caret,
+    Dollar,
 }
 
 pub fn tokenize(str: &str) -> Vec<Token> {
@@ -23,13 +24,14 @@ pub fn tokenize(str: &str) -> Vec<Token> {
 
     for c in characters {
         let new_token = match c {
+            '$' => Token::Dollar,
+            '^' => Token::Caret,
             '.' => Token::Dot,
             '\\' => Token::BackSlash,
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
             '[' => Token::OpenBracket,
             ']' => Token::CloseBracket,
-            '^' => Token::Caret,
             '*' => Token::Star,
             '+' => Token::Plus,
             '|' => Token::Pipe,

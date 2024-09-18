@@ -27,6 +27,8 @@ fn main() {
 
     dbg!(pattern_tokens, &expression);
 
+    let input = format!("\n{}\n", input);
+
     match evaluate(&expression, &input) {
         Some(result) => {
             println!("Match found: {}", result);

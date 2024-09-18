@@ -57,6 +57,14 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
             Some(next_char) if !group.contains(&next_char) => Some(String::from(next_char)),
             _ => None,
         },
+        Expression::BeginningOfLine => match chars.next() {
+            Some('\n') => Some("".to_string()),
+            _ => None,
+        },
+        Expression::EndOfLine => match chars.next() {
+            Some('\n') => Some("".to_string()),
+            _ => None,
+        },
     }
 }
 

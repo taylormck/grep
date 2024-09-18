@@ -9,4 +9,6 @@ pub enum Expression {
     Capture(Box<Expression>),
     CharacterGroup(HashSet<char>),
     NegativeCharacterGroup(HashSet<char>),
+    BeginningOfLine,
+    EndOfLine,
 }

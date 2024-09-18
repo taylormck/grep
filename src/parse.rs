@@ -19,6 +19,8 @@ pub fn parse(tokens: &[Token]) -> Expression {
 fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
     match token {
         Token::Literal(c) => Expression::Literal(*c),
+        Token::Caret => Expression::BeginningOfLine,
+        Token::Dollar => Expression::EndOfLine,
         Token::BackSlash => {
             if let Some(token) = tokens.next() {
                 return match token {
