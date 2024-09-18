@@ -1,12 +1,16 @@
 use crate::{character_sets, token::Token};
 use core::iter;
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expression {
+    Empty,
     Sequence(Vec<Expression>),
     Literal(char),
     Escape(char),
     Capture(Box<Expression>),
+    CharacterGroup(HashSet<char>),
+    NegativeCharacterGroup(HashSet<char>),
 }
 
 pub fn parse(tokens: &[Token]) -> Expression {
@@ -52,6 +56,35 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
 
             Expression::Capture(Box::from(parse(&inner_tokens)))
         }
+        Token::OpenBracket => {
+            let mut group_chars: HashSet<char> = HashSet::new();
+
+            let is_negative = match tokens.peek() {
+                Some(Token::Caret) => {
+                    tokens.next();
+                    true
+                }
+                _ => false,
+            };
+
+            loop {
+                match tokens.next() {
+                    Some(Token::CloseBracket) => {
+                        break;
+                    }
+                    Some(Token::Literal(c)) => {
+                        group_chars.insert(*c);
+                    }
+                    None => panic!("Unended character group!"),
+                    _ => panic!("Unsupported token in character group!"),
+                }
+            }
+
+            match is_negative {
+                true => Expression::NegativeCharacterGroup(group_chars),
+                false => Expression::CharacterGroup(group_chars),
+            }
+        }
         _ => todo!(),
     }
 }
@@ -76,6 +109,7 @@ pub fn evaluate(expression: &Expression, input: &str) -> Option<String> {
 
 fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Option<String> {
     match expression {
+        Expression::Empty => Some("".to_string()),
         Expression::Sequence(expressions) => {
             let mut results: Vec<String> = vec![];
 
@@ -105,6 +139,14 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
             _ => None,
         },
         Expression::Capture(expr) => evaluate_from_beginning(expr, chars),
+        Expression::CharacterGroup(group) => match chars.next() {
+            Some(next_char) if group.contains(&next_char) => Some(String::from(next_char)),
+            _ => None,
+        },
+        Expression::NegativeCharacterGroup(group) => match chars.next() {
+            Some(next_char) if !group.contains(&next_char) => Some(String::from(next_char)),
+            _ => None,
+        },
     }
 }
 
