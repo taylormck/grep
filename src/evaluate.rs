@@ -31,7 +31,6 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
                         let mut stack = vec![("".to_string(), chars.clone())];
 
                         while let Some(result) = evaluate_from_beginning(repeated_expr, chars) {
-                            eprintln!("Hello");
                             stack.push((result, chars.clone()));
                         }
 
