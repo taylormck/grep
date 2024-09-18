@@ -35,24 +35,33 @@ fn main() {
     }
 
     let pattern = env::args().nth(2).unwrap();
-    let parsed_patterns = parse_patterns(&pattern);
-    dbg!(&parsed_patterns);
+    let tokenized_patterns = tokenize_search_pattern(&pattern);
 
     let mut input_line = String::new();
-
     io::stdin().read_line(&mut input_line).unwrap();
 
     let mut input_chars = input_line.chars().peekable();
+    let mut back_refs = Vec::<String>::new();
 
-    match parsed_patterns[0] {
+    dbg!(&tokenized_patterns);
+
+    match tokenized_patterns[0] {
         Pattern::Basic(BasicPattern::BeginningOfLine) => {
-            if match_patterns(&mut input_chars.clone(), &mut parsed_patterns[1..].iter()) {
+            if match_patterns(
+                &mut input_chars.clone(),
+                &mut tokenized_patterns[1..].iter(),
+                &mut back_refs,
+            ) {
                 process::exit(0);
             }
         }
         _ => {
             while input_chars.peek().is_some() {
-                if match_patterns(&mut input_chars.clone(), &mut parsed_patterns.iter()) {
+                if match_patterns(
+                    &mut input_chars.clone(),
+                    &mut tokenized_patterns.iter(),
+                    &mut back_refs,
+                ) {
                     process::exit(0);
                 }
 
@@ -90,7 +99,7 @@ struct CharacterGroup {
     positive: bool,
 }
 
-fn parse_patterns(pattern: &str) -> Vec<Pattern> {
+fn tokenize_search_pattern(pattern: &str) -> Vec<Pattern> {
     let mut result: Vec<Pattern> = vec![];
     let mut pattern_characters = pattern.chars().peekable();
 
@@ -109,9 +118,7 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                 }
 
                 if !digits.is_empty() {
-                    dbg!(&digits);
                     if let Ok(number) = digits.iter().collect::<String>().parse::<usize>() {
-                        dbg!(number);
                         result.push(Pattern::Backreference(number));
                         continue;
                     }
@@ -172,11 +179,11 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
                         true => Pattern::Union(
                             chars
                                 .split("|")
-                                .map(parse_patterns)
+                                .map(tokenize_search_pattern)
                                 .map(Pattern::Sequence)
                                 .collect::<Vec<Pattern>>(),
                         ),
-                        false => Pattern::Sequence(parse_patterns(chars)),
+                        false => Pattern::Sequence(tokenize_search_pattern(chars)),
                     };
 
                     sequences.push(pattern);
@@ -289,8 +296,13 @@ fn parse_patterns(pattern: &str) -> Vec<Pattern> {
     result
 }
 
-fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIter) -> bool {
+fn match_patterns(
+    input_characters: &mut PatternChars,
+    patterns: &mut PatternsIter,
+    back_refs: &mut Vec<String>,
+) -> bool {
     while let Some(pattern) = patterns.next() {
+        dbg!(pattern);
         let matched: bool = match pattern {
             Pattern::Empty => true,
             Pattern::Basic(pattern) => match_basic_pattern(input_characters, pattern),
@@ -299,22 +311,54 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
                 let pattern = [*pattern.clone()];
 
                 // Try to grab as many characters as possible, greedy style
-                while match_patterns(input_characters, &mut pattern.iter()) {
+                while match_patterns(
+                    input_characters,
+                    &mut pattern.iter(),
+                    &mut back_refs.clone(),
+                ) {
                     stack.push(input_characters.clone());
                 }
 
                 // Work our way back down the stack until we match the rest of the input
                 while let Some(mut remaining_input) = stack.pop() {
-                    if match_patterns(&mut remaining_input, &mut patterns.clone()) {
+                    if match_patterns(
+                        &mut remaining_input,
+                        &mut patterns.clone(),
+                        &mut back_refs.clone(),
+                    ) {
                         //  Empty the iterator
                         for _ in patterns {}
+
                         return true;
                     }
                 }
 
                 false
             }
-            Pattern::Sequence(patterns) => match_patterns(input_characters, &mut patterns.iter()),
+            Pattern::Sequence(patterns) => {
+                let mut copy = input_characters.clone();
+
+                let s1: String = input_characters.clone().collect();
+
+                if match_patterns(input_characters, &mut patterns.iter(), back_refs) {
+                    let s2: String = input_characters.clone().collect();
+                    dbg!(s1, s2);
+
+                    let mut back_ref = String::new();
+
+                    while copy.clone().lt(&mut *input_characters) {
+                        back_ref.push(copy.next().unwrap());
+                    }
+
+                    back_ref.pop();
+
+                    back_refs.push(back_ref);
+
+                    return true;
+                }
+
+                false
+            }
             Pattern::Union(union_patterns) => union_patterns.iter().any(|sub_pattern| {
                 let mut remaining_patterns = vec![sub_pattern.clone()];
                 remaining_patterns.extend(patterns.clone().cloned());
@@ -324,6 +368,7 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
                 if match_patterns(
                     &mut input_characters_clone,
                     &mut remaining_patterns.as_slice().iter(),
+                    &mut back_refs.clone(),
                 ) {
                     //  Empty the iterator
                     for _ in &mut *patterns {}
@@ -332,7 +377,20 @@ fn match_patterns(input_characters: &mut PatternChars, patterns: &mut PatternsIt
 
                 false
             }),
-            Pattern::Backreference(_pattern) => false,
+            Pattern::Backreference(back_ref_index) => {
+                dbg!(back_ref_index);
+                if *back_ref_index < back_refs.len() {
+                    let pattern: Vec<Pattern> = back_refs[*back_ref_index]
+                        .chars()
+                        .map(BasicPattern::Character)
+                        .map(Pattern::Basic)
+                        .collect();
+
+                    return match_patterns(input_characters, &mut pattern.iter(), back_refs);
+                }
+
+                false
+            }
         };
 
         if !matched {
