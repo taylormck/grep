@@ -1,4 +1,4 @@
-use grep_starter_rust::{expression, token};
+use grep_starter_rust::{evaluate, parse, token};
 use std::{env, io, process};
 
 // type PatternChas<'a> = std::iter::Peekable<str::Chars<'a>>;
@@ -23,11 +23,11 @@ fn main() {
     io::stdin().read_line(&mut input).unwrap();
 
     let pattern_tokens = token::tokenize(&pattern);
-    let expression = expression::parse(&pattern_tokens);
+    let expression = parse(&pattern_tokens);
 
     dbg!(pattern_tokens, &expression);
 
-    match expression::evaluate(&expression, &input) {
+    match evaluate(&expression, &input) {
         Some(result) => {
             println!("Match found: {}", result);
         }
