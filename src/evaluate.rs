@@ -126,6 +126,7 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
 
             None
         }
+        Expression::BackReference(_num) => None,
     }
 }
 

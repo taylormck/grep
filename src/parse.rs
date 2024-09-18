@@ -42,12 +42,34 @@ fn parse_unary(token: &Token, tokens: &mut TokenIter) -> Expression {
 fn parse_base_token(token: &Token, tokens: &mut TokenIter) -> Expression {
     match token {
         Token::Literal(c) => Expression::Literal(*c),
+        Token::Space => Expression::Literal(' '),
         Token::Caret => Expression::BeginningOfLine,
         Token::Dollar => Expression::EndOfLine,
         Token::Dot => Expression::Wildcard,
         Token::BackSlash => {
             if let Some(token) = tokens.next() {
                 return match token {
+                    Token::Literal(d) if character_sets::NUMERIC_CHARACTERS.contains(d) => {
+                        let mut num = format!("{}", d);
+
+                        while let Some(token) = tokens.peek() {
+                            match token {
+                                Token::Literal(d)
+                                    if character_sets::NUMERIC_CHARACTERS.contains(d) =>
+                                {
+                                    num.push(*d);
+                                    tokens.next();
+                                }
+                                _ => break,
+                            }
+                        }
+                        let num = match num.parse() {
+                            Ok(n) => n,
+                            Err(_) => panic!("Invalid number: {}", num),
+                        };
+
+                        Expression::BackReference(num)
+                    }
                     Token::Literal(c) if character_sets::VALID_ESCAPE_CHARACTERS.contains(c) => {
                         Expression::Escape(*c)
                     }

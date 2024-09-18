@@ -25,7 +25,7 @@ fn main() {
     let pattern_tokens = token::tokenize(&pattern);
     let expression = parse(&pattern_tokens);
 
-    // dbg!(pattern_tokens, &expression);
+    dbg!(pattern_tokens, &expression);
 
     let input = format!("\n{}\n", input);
 
