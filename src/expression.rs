@@ -12,4 +12,5 @@ pub enum Expression {
     BeginningOfLine,
     EndOfLine,
     Repeat(Box<Expression>),
+    Optional(Box<Expression>),
 }

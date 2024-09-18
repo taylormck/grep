@@ -102,6 +102,17 @@ fn evaluate_from_beginning(expression: &Expression, chars: &mut CharIter) -> Opt
             _ => None,
         },
         Expression::Repeat(_) => None,
+        Expression::Optional(expr) => {
+            let mut forward_chars = chars.clone();
+
+            match evaluate_from_beginning(expr, &mut forward_chars) {
+                Some(result) => {
+                    *chars = forward_chars;
+                    Some(result)
+                }
+                None => Some("".to_string()),
+            }
+        }
     }
 }
 

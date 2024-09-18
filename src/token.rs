@@ -16,6 +16,7 @@ pub enum Token {
     Dot,
     Caret,
     Dollar,
+    Question,
 }
 
 pub fn tokenize(str: &str) -> Vec<Token> {
@@ -34,6 +35,7 @@ pub fn tokenize(str: &str) -> Vec<Token> {
             ']' => Token::CloseBracket,
             '*' => Token::Star,
             '+' => Token::Plus,
+            '?' => Token::Question,
             '|' => Token::Pipe,
             '-' => Token::Hyphen,
             ' ' => Token::Space,

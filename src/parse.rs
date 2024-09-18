@@ -23,14 +23,17 @@ fn parse_unary(token: &Token, tokens: &mut TokenIter) -> Expression {
         match token {
             Token::Star => {
                 lhs = Expression::Repeat(Box::from(lhs));
-                tokens.next();
             }
             Token::Plus => {
                 lhs = Expression::Sequence(vec![lhs.clone(), Expression::Repeat(Box::from(lhs))]);
-                tokens.next();
+            }
+            Token::Question => {
+                lhs = Expression::Optional(Box::from(lhs));
             }
             _ => break,
         };
+
+        tokens.next();
     }
 
     lhs
