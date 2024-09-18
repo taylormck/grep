@@ -6,6 +6,7 @@ pub enum Expression {
     Sequence(Vec<Expression>),
     Literal(char),
     Escape(char),
+    Capture(Box<Expression>),
 }
 
 pub fn parse(tokens: Vec<Token>) -> Expression {
@@ -36,6 +37,19 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
             }
 
             panic!("Can't use a backslash at the end of the pattern.")
+        }
+        Token::OpenParen => {
+            let mut inner_tokens = vec![];
+
+            while let Some(token) = tokens.peek() {
+                if token == &&Token::CloseParen {
+                    tokens.next();
+                    break;
+                }
+                inner_tokens.push(*tokens.next().unwrap());
+            }
+
+            Expression::Capture(Box::from(parse(inner_tokens)))
         }
         _ => todo!(),
     }
