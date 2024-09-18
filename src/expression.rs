@@ -32,6 +32,7 @@ fn parse_token(token: &Token, tokens: &mut TokenIter) -> Expression {
                     Token::Literal(c) if character_sets::VALID_ESCAPE_CHARACTERS.contains(c) => {
                         Expression::Escape(*c)
                     }
+                    Token::BackSlash => Expression::Escape('\\'),
                     _ => panic!("Unsupported esacpe sequence."),
                 };
             }
