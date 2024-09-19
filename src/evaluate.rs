@@ -3,9 +3,10 @@ type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 
 pub fn evaluate(expression: &Expression, input: &str) -> Option<String> {
     let mut chars = input.chars().peekable();
-    let mut backreferences: Vec<String> = Vec::new();
 
     while chars.peek().is_some() {
+        let mut backreferences: Vec<String> = Vec::new();
+
         match evaluate_from_beginning(expression, &mut chars.clone(), &mut backreferences) {
             Some(result) => {
                 return Some(result);
@@ -27,39 +28,56 @@ fn evaluate_from_beginning(
         Expression::Empty => Some("".to_string()),
         Expression::Sequence(expressions) => {
             let mut results: Vec<String> = vec![];
-
             let mut remaining_expressions = expressions.iter();
 
             while let Some(expr) = remaining_expressions.next() {
                 match expr {
                     Expression::Repeat(repeated_expr) => {
-                        let mut stack = vec![("".to_string(), chars.clone())];
+                        let mut stack_string = String::new();
+                        let mut chars_backup = chars.clone();
+                        let mut stack =
+                            vec![(stack_string.clone(), chars.clone(), backreferences.clone())];
 
                         while let Some(result) =
                             evaluate_from_beginning(repeated_expr, chars, backreferences)
                         {
-                            stack.push((result, chars.clone()));
+                            stack_string.push_str(&result);
+                            stack.push((
+                                stack_string.clone(),
+                                chars.clone(),
+                                backreferences.clone(),
+                            ));
+                            chars_backup = chars.clone();
                         }
+
+                        *chars = chars_backup;
 
                         let remaining_expressions: Vec<Expression> =
                             remaining_expressions.clone().cloned().collect();
 
-                        let remaining_expressions = match remaining_expressions.len() {
-                            0 => Expression::Empty,
-                            _ => Expression::Sequence(remaining_expressions),
-                        };
+                        if remaining_expressions.is_empty() {
+                            results.push(stack_string);
+                            let result: String = results.iter().map(String::from).collect();
+
+                            return Some(result);
+                        }
+
+                        let remaining_expressions = Expression::Sequence(remaining_expressions);
 
                         // Work our way back down the stack until we match the rest of the input
-                        while let Some((matched_str, mut remaining_input)) = stack.pop() {
+                        while let Some((matched_str, mut remaining_input, mut backreferences)) =
+                            stack.pop()
+                        {
                             if let Some(result) = evaluate_from_beginning(
                                 &remaining_expressions,
                                 &mut remaining_input,
-                                &mut backreferences.clone(),
+                                &mut backreferences,
                             ) {
                                 results.push(matched_str);
                                 results.push(result);
+                                let result: String = results.iter().map(String::from).collect();
 
-                                return Some(results.iter().map(String::from).collect());
+                                return Some(result);
                             }
                         }
 
@@ -80,7 +98,7 @@ fn evaluate_from_beginning(
             Some(results.iter().map(String::from).collect())
         }
         Expression::Literal(c) => match chars.next() {
-            Some(next_char) if next_char == *c => Some(String::from(*c)),
+            Some(next_char) if next_char == *c => Some(String::from(next_char)),
             Some('\n') => evaluate_from_beginning(expression, chars, backreferences),
             _ => None,
         },

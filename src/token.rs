@@ -39,7 +39,7 @@ pub fn tokenize(str: &str) -> Vec<Token> {
             '|' => Token::Pipe,
             '-' => Token::Hyphen,
             ' ' => Token::Space,
-            c if character_sets::ALPHANUMERIC_CHARACTERS.contains(&c) => Token::Literal(c),
+            c if character_sets::VALID_CHARACTERS.contains(&c) => Token::Literal(c),
             _ => panic!("Unhandled character: {}", c),
         };
 

@@ -3,6 +3,11 @@ use std::{env, io, process};
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() {
+    if env::args().len() < 3 {
+        eprintln!("Usage: echo <input_text> | your_program.sh -E <pattern>");
+        process::exit(1);
+    }
+
     if env::args().nth(1).unwrap() != "-E" {
         eprintln!("Expected first argument to be '-E'");
         process::exit(1);
@@ -17,21 +22,24 @@ fn main() {
     };
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
+    if io::stdin().read_line(&mut input).is_err() {
+        eprintln!("No input");
+        process::exit(1);
+    }
 
     let pattern_tokens = token::tokenize(&pattern);
     let expression = parse(&pattern_tokens);
 
-    dbg!(pattern_tokens, &expression);
+    // dbg!(pattern_tokens, &expression);
 
     let input = format!("\n{}\n", input);
 
     match evaluate(&expression, &input) {
-        Some(_result) => {
-            // println!("Match found: {}", result);
+        Some(result) => {
+            println!("Match found: \"{}\"", result);
         }
         None => {
-            // println!("No match!");
+            println!("No match!");
             process::exit(1);
         }
     }
