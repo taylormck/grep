@@ -112,13 +112,21 @@ fn evaluate_from_beginning(
             Some(next_char) if match_escape_pattern(next_char, c) => Some(String::from(next_char)),
             _ => None,
         },
-        Expression::Capture(expr) => match evaluate_from_beginning(expr, chars, backreferences) {
-            Some(result) => {
-                backreferences.push(result.clone());
-                Some(result)
+        Expression::Capture(expr) => {
+            backreferences.push("".to_string());
+            let current_capture_index = backreferences.len() - 1;
+
+            match evaluate_from_beginning(expr, chars, backreferences) {
+                Some(result) => {
+                    backreferences[current_capture_index] = result.clone();
+                    Some(result)
+                }
+                _ => {
+                    backreferences.pop();
+                    None
+                }
             }
-            _ => None,
-        },
+        }
 
         Expression::CharacterGroup(group) => match chars.next() {
             Some(next_char) if group.contains(&next_char) => Some(String::from(next_char)),
