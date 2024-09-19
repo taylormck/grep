@@ -43,6 +43,7 @@ fn parse_base_token(token: &Token, tokens: &mut TokenIter) -> Expression {
     match token {
         Token::Literal(c) => Expression::Literal(*c),
         Token::Space => Expression::Literal(' '),
+        Token::Hyphen => Expression::Literal('-'),
         Token::Caret => Expression::BeginningOfLine,
         Token::Dollar => Expression::EndOfLine,
         Token::Dot => Expression::Wildcard,
