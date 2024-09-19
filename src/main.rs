@@ -34,15 +34,17 @@ fn main() {
 
     let input = format!("\n{}\n", input);
 
-    match evaluate(&expression, &input) {
-        Some(result) => {
-            println!("Match found: \"{}\"", result);
-        }
-        None => {
-            println!("No match!");
-            process::exit(1);
-        }
-    }
+    // match evaluate(&expression, &input) {
+    //     Some(result) => {
+    //         println!("Match found: \"{}\"", result);
+    //     }
+    //     None => {
+    //         println!("No match!");
+    //         process::exit(1);
+    //     }
+    // }
 
-    process::exit(0);
+    if evaluate(&expression, &input).is_none() {
+        process::exit(1);
+    }
 }

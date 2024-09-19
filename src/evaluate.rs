@@ -125,7 +125,12 @@ fn evaluate_from_beginning(
             _ => None,
         },
         Expression::NegativeCharacterGroup(group) => match chars.next() {
-            Some(next_char) if !group.contains(&next_char) => Some(String::from(next_char)),
+            Some(next_char)
+                if character_sets::VALID_CHARACTERS.contains(&next_char)
+                    && !group.contains(&next_char) =>
+            {
+                Some(String::from(next_char))
+            }
             _ => None,
         },
         Expression::BeginningOfLine => match chars.next() {
