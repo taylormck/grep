@@ -134,7 +134,7 @@ fn evaluate_from_beginning(
         },
         Expression::NegativeCharacterGroup(group) => match chars.next() {
             Some(next_char)
-                if character_sets::VALID_CHARACTERS.contains(&next_char)
+                if character_sets::ALPHANUMERIC_CHARACTERS.contains(&next_char)
                     && !group.contains(&next_char) =>
             {
                 Some(String::from(next_char))
